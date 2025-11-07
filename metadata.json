@@ -1,0 +1,8 @@
+{
+  "name": "KSSEM-HIO25011  PANTRIX - Smart Pantry & Waste Reduction",
+  "description": "An intelligent platform for homes, restaurants, and NGOs to manage inventory, reduce food waste, and facilitate food donations seamlessly.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
