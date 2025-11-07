@@ -27,7 +27,8 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         
         if (typeof result === 'string' && options) {
-            return Object.entries(options).reduce((acc, [optKey, optValue]) => {
+            // FIX: Explicitly type the accumulator `acc` as a string to resolve a TypeScript inference issue.
+            return Object.entries(options).reduce((acc: string, [optKey, optValue]) => {
                 return acc.replace(`{${optKey}}`, String(optValue));
             }, result);
         }

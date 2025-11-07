@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Recipe, InventoryItem, SmartPlateData, UserProfile, WasteHotspot, LearningModuleContent } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+const ai = new GoogleGenAI({ apiKey });
 
 const parseJsonResponse = (jsonText: string) => {
     try {
@@ -523,7 +524,8 @@ export const generateSmartPlate = async (foodItems: string[], userProfile: UserP
 
 export const generateRecipeVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKeyForVideo = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+        const ai = new GoogleGenAI({ apiKey: apiKeyForVideo });
 
         let operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
@@ -545,7 +547,7 @@ export const generateRecipeVideo = async (prompt: string, aspectRatio: '16:9' | 
             throw new Error("Video generation finished, but no download link was provided.");
         }
 
-        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+        const response = await fetch(`${downloadLink}&key=${apiKeyForVideo}`);
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to download video: ${response.statusText} - ${errorText}`);

@@ -76,7 +76,8 @@ const HealthBot: React.FC<HealthBotProps> = ({ onClose }) => {
         const currentLanguageName = languageMap[language] || 'English';
         const systemInstruction = `You are a friendly and knowledgeable HealthBot. You can help users create diet plans, answer health-related questions, and provide general wellness advice. Always remind the user that you are not a medical professional and they should consult a doctor for any serious health concerns. Keep your responses concise and easy to understand. IMPORTANT: The user is speaking ${currentLanguageName}. You MUST respond in ${currentLanguageName}.`;
         
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
+        const ai = new GoogleGenAI({ apiKey });
         chatRef.current = ai.chats.create({
             model: 'gemini-2.5-flash',
             config: {

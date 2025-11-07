@@ -55,8 +55,12 @@ const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen, onClo
 
         const checkKey = async () => {
             setIsCheckingApiKey(true);
-            const hasKey = await window.aistudio.hasSelectedApiKey();
-            setApiKeySelected(hasKey);
+            if (typeof window.aistudio !== 'undefined' && window.aistudio) {
+                const hasKey = await window.aistudio.hasSelectedApiKey();
+                setApiKeySelected(hasKey);
+            } else {
+                setApiKeySelected(true);
+            }
             setIsCheckingApiKey(false);
         };
         checkKey();
@@ -64,8 +68,10 @@ const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen, onClo
     }, [isOpen]);
 
     const handleSelectKey = async () => {
-        await window.aistudio.openSelectKey();
-        setApiKeySelected(true);
+        if (typeof window.aistudio !== 'undefined' && window.aistudio) {
+            await window.aistudio.openSelectKey();
+            setApiKeySelected(true);
+        }
     };
 
     const handleGenerate = async () => {
