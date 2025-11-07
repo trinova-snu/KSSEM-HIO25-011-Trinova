@@ -1,0 +1,17 @@
+
+{
+  "name": "pantrix-backend",
+  "version": "1.0.0",
+  "description": "Secure proxy server for Pantrix application",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.20.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

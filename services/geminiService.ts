@@ -1,6 +1,13 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Recipe, InventoryItem, SmartPlateData, UserProfile, WasteHotspot, LearningModuleContent } from '../types';
 
+// The backend URL. In a real app, you'd use an environment variable for this.
+const BACKEND_URL = 'http://localhost:3001';
+
+// This frontend instance of the AI client is now only used for functions
+// that haven't been migrated to the backend yet.
+// In a full implementation, you might remove this entirely from the frontend.
 const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
 const ai = new GoogleGenAI({ apiKey });
 
@@ -30,6 +37,41 @@ export interface NgoWithCoords {
     latitude: number;
     longitude: number;
 }
+
+// **UPDATED FUNCTION TO USE THE BACKEND**
+export const getRecipeSuggestions = async (foodItem: string, userProfile: UserProfile | null, language: string): Promise<Recipe[]> => {
+    try {
+        // Instead of calling Gemini directly, we call our own backend server.
+        const response = await fetch(`${BACKEND_URL}/api/recipes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ foodItem, userProfile, language }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to fetch recipes from backend.');
+        }
+
+        const data = await response.json();
+        
+        if (data && data.recipes) {
+            return data.recipes;
+        } else {
+            console.error("Unexpected JSON structure from backend:", data);
+            return [];
+        }
+    } catch (error) {
+        console.error("Error fetching recipe suggestions:", error);
+        throw new Error("Could not fetch recipes.");
+    }
+};
+
+// --- ALL FUNCTIONS BELOW THIS LINE ARE UNCHANGED ---
+// In a real application, you would create backend endpoints for each of these
+// and update them to fetch from your backend, just like the function above.
 
 export const geocodeLocation = async (address: string): Promise<GeoLocation> => {
     try {
@@ -94,73 +136,6 @@ export const getBusinessNames = async (location: string, businessType: 'restaura
         console.error(`Error fetching ${businessType} names:`, error);
         if (businessType === 'restaurant') return ['The Grand Eatery', 'Sunset Bistro', 'Ocean\'s Catch', 'Mountain View Grill', 'City Center Cafe'];
         return ['City Harvest Food Bank', 'Community FoodShare', 'Regional Food Pantry', 'Hope Distribution Center', 'The Giving Spoon'];
-    }
-};
-
-
-export const getRecipeSuggestions = async (foodItem: string, userProfile: UserProfile | null, language: string): Promise<Recipe[]> => {
-    try {
-        let personalizationInstructions = '';
-        if (userProfile) {
-            const preferences = userProfile.preferences.length > 0 ? `Their taste preferences are: ${userProfile.preferences.join(', ')}.` : '';
-            personalizationInstructions = `\n\nIMPORTANT: Please personalize these recipes for the user. They are from ${userProfile.country}. Deeply incorporate the local cuisine and culinary traditions from their region into the recipe ideas. For example, if they are from Tamil Nadu, India, suggest fusion recipes involving local dishes like idli or dosa. ${preferences} The recipes should also be suitable for their health profile.`;
-        }
-        
-        const languageInstruction = getLanguageInstruction(language);
-
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: `You are an expert chef specializing in reducing food waste. Generate 3 simple and creative recipe ideas for using up the following ingredient: "${foodItem}". For each recipe, provide a name, a brief description, a list of ingredients, and step-by-step instructions.${personalizationInstructions}${languageInstruction}`,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        recipes: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    name: {
-                                        type: Type.STRING,
-                                        description: "The name of the recipe."
-                                    },
-                                    description: {
-                                        type: Type.STRING,
-                                        description: "A brief, enticing description of the recipe."
-                                    },
-                                    ingredients: {
-                                        type: Type.ARRAY,
-                                        items: { type: Type.STRING },
-                                        description: "A list of ingredients required for the recipe."
-                                    },
-                                    instructions: {
-                                        type: Type.ARRAY,
-                                        items: { type: Type.STRING },
-                                        description: "The step-by-step instructions for preparing the recipe."
-                                    }
-                                },
-                                required: ["name", "description", "ingredients", "instructions"]
-                            }
-                        }
-                    },
-                    required: ["recipes"]
-                },
-            },
-        });
-
-        const jsonText = response.text.trim();
-        const parsedJson = parseJsonResponse(jsonText);
-        
-        if (parsedJson && parsedJson.recipes) {
-            return parsedJson.recipes;
-        } else {
-            console.error("Unexpected JSON structure:", parsedJson);
-            return [];
-        }
-    } catch (error) {
-        console.error("Error fetching recipe suggestions:", error);
-        throw new Error("Could not fetch recipes from AI model.");
     }
 };
 
