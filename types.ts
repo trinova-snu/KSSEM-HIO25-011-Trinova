@@ -6,6 +6,41 @@ export interface InventoryItem {
   category: string;
 }
 
+export interface CookedFoodItem {
+  id: string;
+  name: string;
+  description: string;
+  quantity: string;
+  allergens?: string;
+  availableUntil: string; // Time in HH:MM
+  hotelName: string;
+  hotelLocation: string;
+  hotelId: string;
+  status: 'available' | 'claimed';
+}
+
+export interface CookedFoodOrder {
+  id: string;
+  orderId: string;
+  foodItemId: string;
+  foodItemName: string;
+  hotelId: string;
+  hotelName: string;
+  hotelLocation: string;
+  orderedBy: string;
+  orderedById: string;
+  userType: 'public' | 'food-bank';
+  deliveryAddress: string;
+  contactNumber: string;
+  orderTimestamp: string;
+  status: 'placed' | 'preparing' | 'out_for_delivery' | 'delivered';
+  deliveryPerson?: {
+    name: string;
+    phone: string;
+  };
+  estimatedDeliveryTime?: string;
+}
+
 export interface Recipe {
     name: string;
     description: string;
@@ -51,6 +86,7 @@ export interface SmartPlateData {
 }
 
 export interface UserProfile {
+  id: string;
   name: string;
   email: string;
   country: string;
@@ -62,6 +98,7 @@ export interface UserProfile {
 }
 
 export interface HotelProfile {
+  id: string;
   name: string;
   location: string;
   email: string;
@@ -72,6 +109,7 @@ export interface HotelProfile {
 }
 
 export interface FoodBankProfile {
+  id: string;
   name: string;
   location: string;
   email: string;
@@ -140,4 +178,13 @@ export interface LearningModuleContent {
     title: string;
     cards: LearningCard[];
     quiz: QuizQuestion[];
+}
+
+export interface Notification {
+  id: string;
+  type: 'new_requirement' | 'new_cooked_food_order';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
 }

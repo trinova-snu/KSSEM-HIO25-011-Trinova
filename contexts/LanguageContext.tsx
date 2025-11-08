@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect } from 'react';
 import { translations } from '../translations';
 
 type Language = 'en' | 'es' | 'hi' | 'fr' | 'de' | 'ta';
@@ -12,7 +12,26 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [language, setLanguage] = useState<Language>('en');
+    const [language, setLanguage] = useState<Language>(() => {
+        try {
+            const storedValue = window.localStorage.getItem('pantrix-language');
+            if (storedValue) {
+                return JSON.parse(storedValue);
+            }
+        } catch (error) {
+            console.error('Error reading language from localStorage:', error);
+        }
+        return 'en';
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('pantrix-language', JSON.stringify(language));
+        } catch (error) {
+            console.error('Error saving language to localStorage:', error);
+        }
+    }, [language]);
+
 
     const t = useCallback((key: string, options?: { [key: string]: string | number }) => {
         const keys = key.split('.');
@@ -27,7 +46,7 @@ export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         
         if (typeof result === 'string' && options) {
-            // FIX: Explicitly type the accumulator `acc` as a string to resolve a TypeScript inference issue.
+            // Fix: Explicitly type the accumulator in reduce to prevent incorrect type inference by TypeScript.
             return Object.entries(options).reduce((acc: string, [optKey, optValue]) => {
                 return acc.replace(`{${optKey}}`, String(optValue));
             }, result);

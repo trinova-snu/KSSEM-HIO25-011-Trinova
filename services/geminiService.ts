@@ -1,15 +1,7 @@
-
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Recipe, InventoryItem, SmartPlateData, UserProfile, WasteHotspot, LearningModuleContent } from '../types';
 
-// The backend URL. In a real app, you'd use an environment variable for this.
-const BACKEND_URL = 'http://localhost:3001';
-
-// This frontend instance of the AI client is now only used for functions
-// that haven't been migrated to the backend yet.
-// In a full implementation, you might remove this entirely from the frontend.
-const apiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const parseJsonResponse = (jsonText: string) => {
     try {
@@ -37,41 +29,6 @@ export interface NgoWithCoords {
     latitude: number;
     longitude: number;
 }
-
-// **UPDATED FUNCTION TO USE THE BACKEND**
-export const getRecipeSuggestions = async (foodItem: string, userProfile: UserProfile | null, language: string): Promise<Recipe[]> => {
-    try {
-        // Instead of calling Gemini directly, we call our own backend server.
-        const response = await fetch(`${BACKEND_URL}/api/recipes`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ foodItem, userProfile, language }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Failed to fetch recipes from backend.');
-        }
-
-        const data = await response.json();
-        
-        if (data && data.recipes) {
-            return data.recipes;
-        } else {
-            console.error("Unexpected JSON structure from backend:", data);
-            return [];
-        }
-    } catch (error) {
-        console.error("Error fetching recipe suggestions:", error);
-        throw new Error("Could not fetch recipes.");
-    }
-};
-
-// --- ALL FUNCTIONS BELOW THIS LINE ARE UNCHANGED ---
-// In a real application, you would create backend endpoints for each of these
-// and update them to fetch from your backend, just like the function above.
 
 export const geocodeLocation = async (address: string): Promise<GeoLocation> => {
     try {
@@ -136,6 +93,73 @@ export const getBusinessNames = async (location: string, businessType: 'restaura
         console.error(`Error fetching ${businessType} names:`, error);
         if (businessType === 'restaurant') return ['The Grand Eatery', 'Sunset Bistro', 'Ocean\'s Catch', 'Mountain View Grill', 'City Center Cafe'];
         return ['City Harvest Food Bank', 'Community FoodShare', 'Regional Food Pantry', 'Hope Distribution Center', 'The Giving Spoon'];
+    }
+};
+
+
+export const getRecipeSuggestions = async (foodItem: string, userProfile: UserProfile | null, language: string): Promise<Recipe[]> => {
+    try {
+        let personalizationInstructions = '';
+        if (userProfile) {
+            const preferences = userProfile.preferences.length > 0 ? `Their taste preferences are: ${userProfile.preferences.join(', ')}.` : '';
+            personalizationInstructions = `\n\nIMPORTANT: Please personalize these recipes for the user. They are from ${userProfile.country}. Deeply incorporate the local cuisine and culinary traditions from their region into the recipe ideas. For example, if they are from Tamil Nadu, India, suggest fusion recipes involving local dishes like idli or dosa. ${preferences} The recipes should also be suitable for their health profile.`;
+        }
+        
+        const languageInstruction = getLanguageInstruction(language);
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `You are an expert chef specializing in reducing food waste. Generate 3 simple and creative recipe ideas for using up the following ingredient: "${foodItem}". For each recipe, provide a name, a brief description, a list of ingredients, and step-by-step instructions.${personalizationInstructions}${languageInstruction}`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        recipes: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    name: {
+                                        type: Type.STRING,
+                                        description: "The name of the recipe."
+                                    },
+                                    description: {
+                                        type: Type.STRING,
+                                        description: "A brief, enticing description of the recipe."
+                                    },
+                                    ingredients: {
+                                        type: Type.ARRAY,
+                                        items: { type: Type.STRING },
+                                        description: "A list of ingredients required for the recipe."
+                                    },
+                                    instructions: {
+                                        type: Type.ARRAY,
+                                        items: { type: Type.STRING },
+                                        description: "The step-by-step instructions for preparing the recipe."
+                                    }
+                                },
+                                required: ["name", "description", "ingredients", "instructions"]
+                            }
+                        }
+                    },
+                    required: ["recipes"]
+                },
+            },
+        });
+
+        const jsonText = response.text.trim();
+        const parsedJson = parseJsonResponse(jsonText);
+        
+        if (parsedJson && parsedJson.recipes) {
+            return parsedJson.recipes;
+        } else {
+            console.error("Unexpected JSON structure:", parsedJson);
+            return [];
+        }
+    } catch (error) {
+        console.error("Error fetching recipe suggestions:", error);
+        throw new Error("Could not fetch recipes from AI model.");
     }
 };
 
@@ -499,8 +523,7 @@ export const generateSmartPlate = async (foodItems: string[], userProfile: UserP
 
 export const generateRecipeVideo = async (prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
     try {
-        const apiKeyForVideo = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-        const ai = new GoogleGenAI({ apiKey: apiKeyForVideo });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         let operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
@@ -522,7 +545,7 @@ export const generateRecipeVideo = async (prompt: string, aspectRatio: '16:9' | 
             throw new Error("Video generation finished, but no download link was provided.");
         }
 
-        const response = await fetch(`${downloadLink}&key=${apiKeyForVideo}`);
+        const response = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`Failed to download video: ${response.statusText} - ${errorText}`);
@@ -651,5 +674,46 @@ export const getLearningContent = async (topicId: 'food-storage' | 'carbon-impac
     } catch (error) {
         console.error("Error fetching learning content:", error);
         throw new Error("Could not fetch learning content from AI model.");
+    }
+};
+
+export const getDeliveryPersonNames = async (location: string): Promise<{name: string, phone: string}[]> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Generate a list of 5 fictional but realistic-sounding full names for delivery drivers in "${location}". Also provide a fictional but realistic phone number for each in the format (XXX) XXX-XXXX. The names should be culturally appropriate for the location.`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        drivers: {
+                            type: Type.ARRAY,
+                            items: {
+                                type: Type.OBJECT,
+                                properties: {
+                                    name: { type: Type.STRING, description: "The full name of the driver." },
+                                    phone: { type: Type.STRING, description: "The driver's phone number." }
+                                },
+                                required: ["name", "phone"]
+                            }
+                        }
+                    },
+                    required: ["drivers"]
+                },
+            },
+        });
+        const jsonText = response.text.trim();
+        const parsedJson = parseJsonResponse(jsonText);
+        if (parsedJson && parsedJson.drivers && Array.isArray(parsedJson.drivers)) {
+            return parsedJson.drivers;
+        }
+        throw new Error("Unexpected structure for delivery person names.");
+    } catch (error) {
+        console.error(`Error fetching delivery person names:`, error);
+        // Fallback data
+        if (location.includes("India")) return [{name: 'Rohan Sharma', phone: '(555) 123-4567'}, {name: 'Priya Patel', phone: '(555) 234-5678'}, {name: 'Amit Singh', phone: '(555) 876-5432'}];
+        if (location.includes("New York")) return [{name: 'John Smith', phone: '(555) 345-6789'}, {name: 'Maria Garcia', phone: '(555) 456-7890'}, {name: 'Chen Wei', phone: '(555) 987-6543'}];
+        return [{name: 'Alex Johnson', phone: '(555) 111-2222'}, {name: 'Samira Ahmed', phone: '(555) 333-4444'}, {name: 'Carlos Gomez', phone: '(555) 555-6666'}];
     }
 };

@@ -1,8 +1,8 @@
 import React from 'react';
-import { DashboardIcon, ListIcon, BotIcon, ShoppingCartIcon, BrainCircuitIcon } from './icons';
+import { DashboardIcon, ListIcon, BotIcon, ShoppingCartIcon, BrainCircuitIcon, PackageIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
-type PublicView = 'dashboard' | 'inventory' | 'healthbot' | 'shopping-list' | 'knowledge';
+type PublicView = 'dashboard' | 'inventory' | 'healthbot' | 'shopping-list' | 'knowledge' | 'my_orders';
 
 interface PublicNavProps {
     activeView: PublicView;
@@ -16,7 +16,7 @@ const PublicNav: React.FC<PublicNavProps> = ({ activeView, setView }) => {
     const inactiveClasses = "bg-light-bg text-text-light hover:bg-border-color";
 
     return (
-        <div className="bg-dark-bg/50 p-2 rounded-full flex gap-2 max-w-xl mx-auto border border-border-color">
+        <div className="bg-dark-bg/50 p-2 rounded-full flex gap-2 max-w-2xl mx-auto border border-border-color">
             <button
                 onClick={() => setView('dashboard')}
                 className={`${commonClasses} ${activeView === 'dashboard' ? activeClasses : inactiveClasses} flex-1 justify-center`}
@@ -37,6 +37,13 @@ const PublicNav: React.FC<PublicNavProps> = ({ activeView, setView }) => {
             >
                 <ShoppingCartIcon className="w-5 h-5" />
                 <span>{t('nav.shopping_list')}</span>
+            </button>
+             <button
+                onClick={() => setView('my_orders')}
+                className={`${commonClasses} ${activeView === 'my_orders' ? activeClasses : inactiveClasses} flex-1 justify-center`}
+            >
+                <PackageIcon className="w-5 h-5" />
+                <span>{t('nav.my_orders')}</span>
             </button>
              <button
                 onClick={() => setView('knowledge')}

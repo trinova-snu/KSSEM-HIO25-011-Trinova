@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { DonationRequest, MembershipTier, FoodBankProfile, RequirementRequest, WasteHotspot } from '../types';
-import { InfoIcon, TruckIcon, CheckCircleIcon, XCircleIcon, UsersIcon, AwardIcon, MegaphoneIcon, TargetIcon } from './icons';
+import { DonationRequest, MembershipTier, FoodBankProfile, RequirementRequest, WasteHotspot, CookedFoodItem, CookedFoodOrder } from '../types';
+import { InfoIcon, TruckIcon, CheckCircleIcon, XCircleIcon, UsersIcon, AwardIcon, MegaphoneIcon, TargetIcon, FireIcon, PackageIcon } from './icons';
 import Modal from './Modal';
 import DonationDetailModal from './DonationDetailModal';
 import { useLanguage } from '../contexts/LanguageContext';
 import RestaurantDetailModal from './RestaurantDetailModal';
 import WasteHotspotMap from './WasteHotspotMap';
 import HotelDetailModal from './HotelDetailModal';
+import CookedFoodCard from './CookedFoodCard';
+import CookedFoodOrdersPage from './CookedFoodOrdersPage';
 
 const foodCategories = ["Produce", "Dairy", "Meat", "Bakery", "Pantry", "Frozen", "Drinks"];
 
@@ -18,9 +20,13 @@ interface FoodBankDashboardProps {
     foodBankProfile: FoodBankProfile | null;
     onCreateRequirementRequest: (requestData: Omit<RequirementRequest, 'id' | 'timestamp'>) => void;
     wasteHotspots: WasteHotspot[];
+    cookedFoodItems: CookedFoodItem[];
+    onClaimCookedFood: (item: CookedFoodItem) => void;
+    cookedFoodOrders: CookedFoodOrder[];
+    onTrackOrder: (order: CookedFoodOrder) => void;
 }
 
-type View = 'pending' | 'active' | 'broadcast' | 'hotspots';
+type View = 'pending' | 'active' | 'broadcast' | 'hotspots' | 'my_orders';
 
 interface PartnerInfo {
     name: string;
@@ -113,7 +119,19 @@ const BroadcastNeedsForm: React.FC<{ foodBankProfile: FoodBankProfile; onCreate:
     );
 };
 
-const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ requests, onAccept, onDecline, onComplete, foodBankProfile, onCreateRequirementRequest, wasteHotspots }) => {
+const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ 
+    requests, 
+    onAccept, 
+    onDecline, 
+    onComplete, 
+    foodBankProfile, 
+    onCreateRequirementRequest, 
+    wasteHotspots,
+    cookedFoodItems,
+    onClaimCookedFood,
+    cookedFoodOrders,
+    onTrackOrder
+}) => {
     const { t } = useLanguage();
     const [view, setView] = useState<View>('pending');
     const [selectedRequest, setSelectedRequest] = useState<DonationRequest | null>(null);
@@ -123,6 +141,7 @@ const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ requests, onAccep
 
     const pendingRequests = requests.filter(r => r.status === 'pending');
     const activeShipments = requests.filter(r => r.status === 'accepted' || r.status === 'completed');
+    const availableCookedFood = cookedFoodItems.filter(item => item.status === 'available');
 
     const { restaurantPartners, partnerDonationCounts } = useMemo(() => {
         const partners = new Map<string, PartnerInfo>();
@@ -194,12 +213,15 @@ const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ requests, onAccep
 
     return (
         <div className="space-y-8">
-            <div className="bg-dark-bg/50 p-2 rounded-full flex gap-2 max-w-2xl mx-auto border border-border-color">
+            <div className="bg-dark-bg/50 p-2 rounded-full flex flex-wrap gap-2 max-w-3xl mx-auto border border-border-color">
                 <NavButton active={view === 'pending'} onClick={() => setView('pending')}>
                     <InfoIcon /> {t('foodBank.pending_requests')}
                 </NavButton>
                 <NavButton active={view === 'active'} onClick={() => setView('active')}>
                     <TruckIcon /> {t('foodBank.active_shipments')}
+                </NavButton>
+                 <NavButton active={view === 'my_orders'} onClick={() => setView('my_orders')}>
+                    <PackageIcon /> {t('foodBank.my_orders')}
                 </NavButton>
                  <NavButton active={view === 'broadcast'} onClick={() => setView('broadcast')}>
                     <MegaphoneIcon /> {t('foodBank.broadcast_needs')}
@@ -208,6 +230,21 @@ const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ requests, onAccep
                     <TargetIcon /> {t('foodBank.waste_hotspots')}
                 </NavButton>
             </div>
+
+            {availableCookedFood.length > 0 && (
+                <div className="space-y-4 my-8 animate-fade-in">
+                    <h2 className="text-2xl font-bold text-text-light border-b-2 border-secondary/50 pb-2 flex items-center gap-3">
+                        <FireIcon className="text-secondary" />
+                        {t('foodBank.available_cooked_food')}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {availableCookedFood.map(item => (
+                            <CookedFoodCard key={item.id} item={item} onClaim={() => onClaimCookedFood(item)} />
+                        ))}
+                    </div>
+                    <style>{`.animate-fade-in { animation: fade-in 0.5s ease-out forwards; } @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }`}</style>
+                </div>
+            )}
             
             <div>
                 {view === 'pending' && (
@@ -219,6 +256,12 @@ const FoodBankDashboard: React.FC<FoodBankDashboardProps> = ({ requests, onAccep
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {activeShipments.length > 0 ? activeShipments.map(renderRequestCard) : <p className="text-text-dark col-span-full text-center py-10">{t('foodBank.no_active')}</p>}
                     </div>
+                )}
+                {view === 'my_orders' && (
+                    <CookedFoodOrdersPage 
+                        orders={cookedFoodOrders}
+                        onTrackOrder={onTrackOrder}
+                    />
                 )}
                 {view === 'broadcast' && foodBankProfile && (
                     <BroadcastNeedsForm foodBankProfile={foodBankProfile} onCreate={onCreateRequirementRequest} />

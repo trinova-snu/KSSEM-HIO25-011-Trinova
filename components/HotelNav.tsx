@@ -1,8 +1,8 @@
 import React from 'react';
-import { DashboardIcon, ListIcon } from './icons';
+import { DashboardIcon, ListIcon, FireIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
-type HotelView = 'dashboard' | 'inventory';
+type HotelView = 'dashboard' | 'inventory' | 'flash_donations';
 
 interface HotelNavProps {
     activeView: HotelView;
@@ -16,7 +16,7 @@ const HotelNav: React.FC<HotelNavProps> = ({ activeView, setView }) => {
     const inactiveClasses = "bg-light-bg text-text-light hover:bg-border-color";
 
     return (
-        <div className="bg-dark-bg/50 p-2 rounded-full flex gap-2 max-w-sm mx-auto border border-border-color">
+        <div className="bg-dark-bg/50 p-2 rounded-full flex gap-2 max-w-md mx-auto border border-border-color">
             <button
                 onClick={() => setView('dashboard')}
                 className={`${commonClasses} ${activeView === 'dashboard' ? activeClasses : inactiveClasses} flex-1 justify-center`}
@@ -30,6 +30,13 @@ const HotelNav: React.FC<HotelNavProps> = ({ activeView, setView }) => {
             >
                 <ListIcon className="w-5 h-5" />
                 <span>{t('nav.inventory')}</span>
+            </button>
+             <button
+                onClick={() => setView('flash_donations')}
+                className={`${commonClasses} ${activeView === 'flash_donations' ? activeClasses : inactiveClasses} flex-1 justify-center`}
+            >
+                <FireIcon className="w-5 h-5" />
+                <span>{t('hotelPantry.flash_donations')}</span>
             </button>
         </div>
     );

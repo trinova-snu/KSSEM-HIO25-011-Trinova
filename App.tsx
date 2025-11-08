@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { InventoryItem as InventoryItemType, DonationRequest, Recipe, ShoppingListItem as ShoppingListItemType, SmartPlateData, UserProfile, HotelProfile, FoodBankProfile, MembershipTier, RequirementRequest, WasteHotspot } from './types';
+import { InventoryItem as InventoryItemType, DonationRequest, Recipe, ShoppingListItem as ShoppingListItemType, SmartPlateData, UserProfile, HotelProfile, FoodBankProfile, MembershipTier, RequirementRequest, WasteHotspot, Notification, CookedFoodItem, CookedFoodOrder } from './types';
 import { getRecipeSuggestions, getSmartRecipes, getShoppingListSuggestions, generateSmartPlate, geocodeLocation, getBusinessNames, getWasteHotspots } from './services/geminiService';
 import Header from './components/Header';
 import InventoryList from './components/InventoryList';
@@ -30,11 +30,18 @@ import VideoGeneratorModal from './components/VideoGeneratorModal';
 import CreateDonationModal from './components/CreateDonationModal';
 import EditProfilePage from './components/EditProfilePage';
 import KnowledgeCenter from './components/KnowledgeCenter';
+import NotificationsModal from './components/NotificationsModal';
+import AnnounceCookedFoodModal from './components/AnnounceCookedFoodModal';
+import ClaimCookedFoodModal from './components/ClaimCookedFoodModal';
+import CookedFoodOrdersPage from './components/CookedFoodOrdersPage';
+import TrackOrderModal from './components/TrackOrderModal';
+import LiveCookedFoodOrders from './components/LiveCookedFoodOrders';
+import AssignDeliveryModal from './components/AssignDeliveryModal';
 
 type Page = 'welcome' | 'public-signup' | 'public-login' | 'hotel-login' | 'hotel-signup' | 'food-bank-login' | 'food-bank-signup' | 'pantry' | 'hotel-pantry' | 'food-bank-dashboard' | 'edit-profile';
 type UserType = 'public' | 'hotel' | 'food-bank' | null;
-type PublicView = 'dashboard' | 'inventory' | 'healthbot' | 'shopping-list' | 'knowledge';
-type HotelView = 'dashboard' | 'inventory';
+type PublicView = 'dashboard' | 'inventory' | 'healthbot' | 'shopping-list' | 'knowledge' | 'my_orders';
+type HotelView = 'dashboard' | 'inventory' | 'flash_donations';
 
 const initialDonationRequests: DonationRequest[] = [
     { id: 'don-16222', restaurantName: 'The Grand Eatery', location: 'New York, USA', items: [{ id: 'd1-1', name: 'Potatoes', expiryDate: '2024-07-20', quantity: '20 lbs', category: 'Produce' }, { id: 'd1-2', name: 'Onions', expiryDate: '2024-07-25', quantity: '10 lbs', category: 'Produce' }], status: 'pending' },
@@ -53,23 +60,49 @@ const getMembershipTier = (donationCount: number): MembershipTier | null => {
     return null;
 };
 
+// A custom hook to persist state to localStorage
+function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+    const [state, setState] = useState<T>(() => {
+        try {
+            const storedValue = window.localStorage.getItem(key);
+            if (storedValue) {
+                return JSON.parse(storedValue);
+            }
+        } catch (error) {
+            console.error(`Error reading localStorage key “${key}”:`, error);
+        }
+        return initialValue;
+    });
+
+    useEffect(() => {
+        try {
+            window.localStorage.setItem(key, JSON.stringify(state));
+        } catch (error) {
+            console.error(`Error setting localStorage key “${key}”:`, error);
+        }
+    }, [key, state]);
+
+    return [state, setState];
+}
+
+
 const AppContent: React.FC = () => {
     const { t, language } = useLanguage();
     // Routing and user state
-    const [currentPage, setCurrentPage] = useState<Page>('welcome');
+    const [currentPage, setCurrentPage] = usePersistentState<Page>('pantrix-currentPage', 'welcome');
     const [previousPage, setPreviousPage] = useState<Page>('welcome');
-    const [userType, setUserType] = useState<UserType>(null);
-    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-    const [hotelProfile, setHotelProfile] = useState<HotelProfile | null>(null);
-    const [foodBankProfile, setFoodBankProfile] = useState<FoodBankProfile | null>(null);
+    const [userType, setUserType] = usePersistentState<UserType>('pantrix-userType', null);
+    const [userProfile, setUserProfile] = usePersistentState<UserProfile | null>('pantrix-userProfile', null);
+    const [hotelProfile, setHotelProfile] = usePersistentState<HotelProfile | null>('pantrix-hotelProfile', null);
+    const [foodBankProfile, setFoodBankProfile] = usePersistentState<FoodBankProfile | null>('pantrix-foodBankProfile', null);
 
     // View state
-    const [publicView, setPublicView] = useState<PublicView>('dashboard');
-    const [hotelView, setHotelView] = useState<HotelView>('dashboard');
+    const [publicView, setPublicView] = usePersistentState<PublicView>('pantrix-publicView', 'dashboard');
+    const [hotelView, setHotelView] = usePersistentState<HotelView>('pantrix-hotelView', 'dashboard');
 
     // Shared state
-    const [inventory, setInventory] = useState<InventoryItemType[]>([]);
-    const [donationRequests, setDonationRequests] = useState<DonationRequest[]>(initialDonationRequests);
+    const [inventory, setInventory] = usePersistentState<InventoryItemType[]>('pantrix-inventory', []);
+    const [donationRequests, setDonationRequests] = usePersistentState<DonationRequest[]>('pantrix-donationRequests', initialDonationRequests);
     
     // UI Modals state
     const [isAddModalOpen, setAddModalOpen] = useState(false);
@@ -87,10 +120,10 @@ const AppContent: React.FC = () => {
     // Hotel user state
     const [smartRecipes, setSmartRecipes] = useState<Recipe[]>([]);
     const [isLoadingSmartRecipes, setIsLoadingSmartRecipes] = useState(false);
-    const [donationCount, setDonationCount] = useState(0);
+    const [donationCount, setDonationCount] = usePersistentState<number>('pantrix-donationCount', 0);
 
     // Shopping List state
-    const [shoppingList, setShoppingList] = useState<ShoppingListItemType[]>([]);
+    const [shoppingList, setShoppingList] = usePersistentState<ShoppingListItemType[]>('pantrix-shoppingList', []);
     const [isLoadingShoppingList, setIsLoadingShoppingList] = useState(false);
 
     // Smart Plate state
@@ -100,8 +133,21 @@ const AppContent: React.FC = () => {
     const [smartPlateError, setSmartPlateError] = useState<string | null>(null);
 
     // Food Bank requirement requests
-    const [requirementRequests, setRequirementRequests] = useState<RequirementRequest[]>([]);
-    const [wasteHotspots, setWasteHotspots] = useState<WasteHotspot[]>([]);
+    const [requirementRequests, setRequirementRequests] = usePersistentState<RequirementRequest[]>('pantrix-requirementRequests', []);
+    const [wasteHotspots, setWasteHotspots] = usePersistentState<WasteHotspot[]>('pantrix-wasteHotspots', []);
+
+    // Notifications state
+    const [notifications, setNotifications] = usePersistentState<Notification[]>('pantrix-notifications', []);
+    const [isNotificationsModalOpen, setNotificationsModalOpen] = useState(false);
+    const unreadNotificationCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
+
+    // Cooked Food state
+    const [cookedFoodItems, setCookedFoodItems] = usePersistentState<CookedFoodItem[]>('pantrix-cookedFood', []);
+    const [cookedFoodOrders, setCookedFoodOrders] = usePersistentState<CookedFoodOrder[]>('pantrix-cookedFoodOrders', []);
+    const [isAnnounceFoodModalOpen, setAnnounceFoodModalOpen] = useState(false);
+    const [claimableFoodItem, setClaimableFoodItem] = useState<CookedFoodItem | null>(null);
+    const [trackableOrder, setTrackableOrder] = useState<CookedFoodOrder | null>(null);
+    const [assignableOrder, setAssignableOrder] = useState<CookedFoodOrder | null>(null);
 
 
     const membershipTier = useMemo(() => {
@@ -129,9 +175,10 @@ const AppContent: React.FC = () => {
     };
 
 
-    // Data loading effect
+    // Data loading effect for new users
     useEffect(() => {
-        if (currentPage === 'pantry' || currentPage === 'hotel-pantry' || currentPage === 'food-bank-dashboard') {
+        // Only populate with initial demo data if the user is logged in and inventory is empty.
+        if (userType && inventory.length === 0 && (currentPage === 'pantry' || currentPage === 'hotel-pantry')) {
             const initialItems: InventoryItemType[] = [
                  { id: '3', name: 'Bread', expiryDate: getDateIn(1), quantity: userType === 'hotel' ? '20 Loaves' : '1 Loaf', category: 'Bakery' },
                  { id: '20', name: 'Avocadoes', expiryDate: getDateIn(2), quantity: userType === 'hotel' ? '40 units': '2 units', category: 'Produce' },
@@ -146,10 +193,41 @@ const AppContent: React.FC = () => {
                 { id: '6', name: 'Tomatoes', expiryDate: getDateIn(6), quantity: userType === 'hotel' ? '30 lbs' : '1 lb', category: 'Produce' },
                 { id: '8', name: 'Pasta', expiryDate: getDateIn(30), quantity: userType === 'hotel' ? '20 boxes' : '1 box', category: 'Pantry' },
             ];
-             setInventory(initialItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()));
+            const sortedItems = initialItems.sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())
+            setInventory(sortedItems);
+
+            // Add demo cooked food items if they don't exist, to make the feature visible
+            if (cookedFoodItems.length === 0) {
+                const initialCookedFood: CookedFoodItem[] = [
+                    {
+                        id: 'cooked-demo-1',
+                        name: 'Paneer Butter Masala',
+                        description: 'Freshly made paneer in a rich tomato and butter gravy. Perfect with naan or rice.',
+                        quantity: '3',
+                        allergens: 'Dairy, Nuts',
+                        availableUntil: '21:00',
+                        hotelName: 'The Grand Eatery',
+                        hotelLocation: 'New York, USA',
+                        hotelId: 'hotel-demo-1',
+                        status: 'available',
+                    },
+                    {
+                        id: 'cooked-demo-2',
+                        name: 'Vegetable Fried Rice',
+                        description: 'A generous portion of fried rice with mixed vegetables, enough for a small family.',
+                        quantity: '4',
+                        availableUntil: '22:00',
+                        hotelName: 'Sunset Bistro',
+                        hotelLocation: 'Los Angeles, USA',
+                        hotelId: 'hotel-demo-2',
+                        status: 'available',
+                    }
+                ];
+                setCookedFoodItems(initialCookedFood);
+            }
 
             if (userType === 'hotel') {
-                 const expiringSoon = initialItems.filter(item => {
+                 const expiringSoon = sortedItems.filter(item => {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0);
                     const expiry = new Date(item.expiryDate);
@@ -162,9 +240,9 @@ const AppContent: React.FC = () => {
                 }
             }
         }
-    }, [currentPage, userType]);
+    }, [userType, inventory.length, currentPage]);
 
-    // Background data fetching after login
+    // Background geocoding for hotel
     useEffect(() => {
         if (userType === 'hotel' && hotelProfile && !hotelProfile.latitude && hotelProfile.location) {
             const fetchCoords = async () => {
@@ -179,14 +257,27 @@ const AppContent: React.FC = () => {
         }
     }, [userType, hotelProfile]);
 
+    // Background geocoding for food bank
     useEffect(() => {
         if (userType === 'food-bank' && foodBankProfile && !foodBankProfile.latitude && foodBankProfile.location) {
-            const fetchFoodBankData = async () => {
+            const fetchCoords = async () => {
+                try {
+                    const coords = await geocodeLocation(foodBankProfile.location);
+                    setFoodBankProfile(prev => prev ? { ...prev, latitude: coords.latitude, longitude: coords.longitude } : null);
+                } catch (e) {
+                    console.error("Failed to geocode food bank location:", e);
+                }
+            };
+            fetchCoords();
+        }
+    }, [userType, foodBankProfile]);
+
+    // Initial data population effect for food bank
+    useEffect(() => {
+        if (userType === 'food-bank' && foodBankProfile?.location && wasteHotspots.length === 0) {
+            const fetchInitialData = async () => {
                 try {
                     const location = foodBankProfile.location;
-                    const coords = await geocodeLocation(location);
-                    setFoodBankProfile(prev => prev ? { ...prev, latitude: coords.latitude, longitude: coords.longitude } : null);
-
                     const [restaurantNames, hotspotData] = await Promise.all([
                         getBusinessNames(location, 'restaurant'),
                         getWasteHotspots(location)
@@ -226,12 +317,12 @@ const AppContent: React.FC = () => {
                     setWasteHotspots(generatedHotspots);
 
                 } catch (e) {
-                    console.error("Failed to fetch background data for food bank:", e);
+                    console.error("Failed to fetch initial data for food bank:", e);
                 }
             };
-            fetchFoodBankData();
+            fetchInitialData();
         }
-    }, [userType, foodBankProfile]);
+    }, [userType, foodBankProfile, wasteHotspots.length]);
 
     // Derived state for dashboards
     const { expiringSoonItems, bulkExpiringItems, expiredCount, expiringSoonCount, priorityItems, expiringSoon } = useMemo(() => {
@@ -360,7 +451,7 @@ const AppContent: React.FC = () => {
         } finally {
             setIsLoadingShoppingList(false);
         }
-    }, [inventory]);
+    }, [inventory, setShoppingList]);
 
     const handleUpdateShoppingListItem = (id: string, updates: Partial<ShoppingListItemType>) => {
         setShoppingList(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
@@ -428,7 +519,101 @@ const AppContent: React.FC = () => {
             timestamp: new Date().toISOString(),
         };
         setRequirementRequests(prev => [newRequest, ...prev]);
+
+        const newNotification: Notification = {
+            id: `notif-${new Date().getTime()}`,
+            type: 'new_requirement',
+            title: `New Urgent Need from ${requestData.foodBankName}`,
+            message: `Requesting: ${requestData.requestedItems.join(', ')}. Message: "${requestData.message}"`,
+            timestamp: new Date().toISOString(),
+            read: false,
+        };
+        setNotifications(prev => [newNotification, ...prev]);
+
         alert('Your requirement request has been broadcast to all partner hotels!');
+    };
+    
+    const handleMarkNotificationsAsRead = () => {
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
+     const handleAnnounceCookedFood = (item: Omit<CookedFoodItem, 'id' | 'hotelName' | 'hotelLocation' | 'hotelId' | 'status'>) => {
+        if (!hotelProfile) return;
+        const newItem: CookedFoodItem = {
+            ...item,
+            id: `cooked-${new Date().getTime()}`,
+            hotelId: hotelProfile.id,
+            hotelName: hotelProfile.name,
+            hotelLocation: hotelProfile.location,
+            status: 'available',
+        };
+        setCookedFoodItems(prev => [newItem, ...prev]);
+        setAnnounceFoodModalOpen(false);
+    };
+
+    const handleClaimCookedFood = (details: { address: string; contact: string; }) => {
+        if (!claimableFoodItem) return;
+        const currentUserProfile = userType === 'public' ? userProfile : foodBankProfile;
+        if (!currentUserProfile) return;
+
+        const newOrder: CookedFoodOrder = {
+            id: `order-${new Date().getTime()}`,
+            orderId: `PANTRIX-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+            foodItemId: claimableFoodItem.id,
+            foodItemName: claimableFoodItem.name,
+            hotelId: claimableFoodItem.hotelId,
+            hotelName: claimableFoodItem.hotelName,
+            hotelLocation: claimableFoodItem.hotelLocation,
+            orderedBy: currentUserProfile.name,
+            orderedById: currentUserProfile.id,
+            userType: userType as 'public' | 'food-bank',
+            deliveryAddress: details.address,
+            contactNumber: details.contact,
+            orderTimestamp: new Date().toISOString(),
+            status: 'placed',
+            estimatedDeliveryTime: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 mins from now
+        };
+
+        setCookedFoodOrders(prev => [newOrder, ...prev]);
+        setCookedFoodItems(prev => prev.map(item => item.id === claimableFoodItem.id ? { ...item, status: 'claimed' } : item));
+
+        // Create notification for the hotel
+        const newNotification: Notification = {
+            id: `notif-order-${new Date().getTime()}`,
+            type: 'new_cooked_food_order',
+            title: `New Order: ${claimableFoodItem.name}`,
+            message: `An order was placed by ${currentUserProfile.name}. Please confirm and prepare for delivery.`,
+            timestamp: new Date().toISOString(),
+            read: false,
+        };
+        // This assumes a global notification system. For a real app, this would be targeted.
+        setNotifications(prev => [newNotification, ...prev]);
+
+        setClaimableFoodItem(null);
+        alert(t('cookedFood.order_placed_message'));
+        if (userType === 'public') {
+            setPublicView('my_orders');
+        }
+    };
+    
+    const handleUpdateCookedFoodOrderStatus = (orderId: string, status: CookedFoodOrder['status'], deliveryPerson?: { name: string; phone: string }) => {
+        setCookedFoodOrders(prev => prev.map(order => {
+            if (order.id === orderId) {
+                const updatedOrder = { ...order, status };
+                if (deliveryPerson) {
+                    updatedOrder.deliveryPerson = deliveryPerson;
+                }
+                if (status === 'out_for_delivery') {
+                    updatedOrder.estimatedDeliveryTime = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins from now
+                }
+                 if (status === 'delivered') {
+                    updatedOrder.estimatedDeliveryTime = new Date().toISOString();
+                }
+                return updatedOrder;
+            }
+            return order;
+        }));
+        setAssignableOrder(null);
     };
 
     const handlePublicSignUp = (profile: UserProfile) => {
@@ -442,6 +627,7 @@ const AppContent: React.FC = () => {
         console.log(`Logging in with ${email} from ${location}`);
         setUserType('public');
         setUserProfile({
+            id: `user-${new Date().getTime()}`,
             name: name,
             email: email,
             country: location,
@@ -457,15 +643,18 @@ const AppContent: React.FC = () => {
 
     const handleHotelLogin = (name: string, location: string, email: string) => {
         setUserType('hotel');
-        setHotelProfile({ name, location, email });
+        setHotelProfile({ name, location, email, id: `hotel-${new Date().getTime()}` });
         setHotelView('dashboard');
         setCurrentPage('hotel-pantry');
-        setDonationCount(12);
+        // Set a sample donation count if it's the default user
+        if (email === 'manager@example.com' && donationCount === 0) {
+            setDonationCount(12);
+        }
     };
     
     const handleHotelSignUp = (profile: HotelProfile) => {
         setUserType('hotel');
-        setHotelProfile(profile);
+        setHotelProfile({ ...profile, id: `hotel-${new Date().getTime()}` });
         setHotelView('dashboard');
         setCurrentPage('hotel-pantry');
         setDonationCount(0);
@@ -473,26 +662,31 @@ const AppContent: React.FC = () => {
 
     const handleFoodBankLogin = (name: string, location: string, email: string, darpanId: string) => {
         setUserType('food-bank');
-        setFoodBankProfile({ name, location, email, darpanId });
+        setFoodBankProfile({ name, location, email, darpanId, id: `fb-${new Date().getTime()}` });
         setCurrentPage('food-bank-dashboard');
     };
 
     const handleFoodBankSignUp = (profile: FoodBankProfile) => {
         setUserType('food-bank');
-        setFoodBankProfile(profile);
+        setFoodBankProfile({ ...profile, id: `fb-${new Date().getTime()}` });
         setCurrentPage('food-bank-dashboard');
     };
 
     const handleLogout = () => {
         setCurrentPage('welcome');
         setUserType(null);
+        // Clear user-specific data
         setInventory([]);
         setUserProfile(null);
         setHotelProfile(null);
         setFoodBankProfile(null);
         setDonationCount(0);
-        setDonationRequests(initialDonationRequests); // Reset to default on logout
+        setShoppingList([]);
         setWasteHotspots([]);
+
+        // Shared data like donation requests, notifications, and cooked food items
+        // are intentionally not cleared to simulate a persistent backend
+        // for this multi-user demo.
     };
     
     const handleGenerateVideo = (recipe: Recipe) => {
@@ -525,7 +719,12 @@ const AppContent: React.FC = () => {
             onOpenSettings: () => setSettingsModalOpen(true),
             onOpenProfile: () => setProfileModalOpen(true),
             userType: userType,
-            userName: userType === 'hotel' ? hotelProfile?.name : userType === 'food-bank' ? foodBankProfile?.name : undefined
+            userName: userType === 'hotel' ? hotelProfile?.name : userType === 'food-bank' ? foodBankProfile?.name : userProfile?.name,
+            unreadNotificationCount: userType === 'hotel' ? unreadNotificationCount : 0,
+            onOpenNotifications: () => {
+                setNotificationsModalOpen(true);
+                handleMarkNotificationsAsRead();
+            },
         };
         switch (currentPage) {
             case 'welcome':
@@ -583,6 +782,8 @@ const AppContent: React.FC = () => {
                                         expiringSoonItems={expiringSoon}
                                         isLoadingSmartPlate={isLoadingSmartPlate}
                                         onGenerateSmartPlate={handleGenerateSmartPlate}
+                                        cookedFoodItems={cookedFoodItems}
+                                        onClaimCookedFood={(item) => setClaimableFoodItem(item)}
                                     />
                                 )}
                                 {publicView === 'inventory' && (
@@ -600,6 +801,12 @@ const AppContent: React.FC = () => {
                                         onUpdateItem={handleUpdateShoppingListItem}
                                         onDeleteItem={handleDeleteShoppingListItem}
                                         onAddItem={handleAddShoppingListItem}
+                                    />
+                                )}
+                                {publicView === 'my_orders' && (
+                                    <CookedFoodOrdersPage 
+                                        orders={cookedFoodOrders.filter(o => o.orderedById === userProfile?.id)}
+                                        onTrackOrder={(order) => setTrackableOrder(order)}
                                     />
                                 )}
                                 {publicView === 'knowledge' && (
@@ -641,12 +848,20 @@ const AppContent: React.FC = () => {
                                         membershipTier={membershipTier}
                                         requirementRequests={requirementRequests}
                                     />
-                                ) : (
+                                ) : hotelView === 'inventory' ? (
                                     <InventoryList
                                         items={inventory}
                                         onDeleteItem={handleDeleteItem}
                                         onGetRecipes={handleFetchRecipes}
                                         showRecipeButton={false}
+                                    />
+                                ) : (
+                                    <LiveCookedFoodOrders
+                                        announcedItems={cookedFoodItems.filter(item => item.hotelId === hotelProfile?.id)}
+                                        orders={cookedFoodOrders.filter(order => order.hotelId === hotelProfile?.id)}
+                                        onAnnounce={() => setAnnounceFoodModalOpen(true)}
+                                        onUpdateStatus={handleUpdateCookedFoodOrderStatus}
+                                        onAssignDelivery={(order) => setAssignableOrder(order)}
                                     />
                                 )}
                             </div>
@@ -666,6 +881,10 @@ const AppContent: React.FC = () => {
                                 foodBankProfile={foodBankProfile}
                                 onCreateRequirementRequest={handleCreateRequirementRequest}
                                 wasteHotspots={wasteHotspots}
+                                cookedFoodItems={cookedFoodItems}
+                                onClaimCookedFood={(item) => setClaimableFoodItem(item)}
+                                cookedFoodOrders={cookedFoodOrders.filter(o => o.orderedById === foodBankProfile?.id)}
+                                onTrackOrder={(order) => setTrackableOrder(order)}
                             />
                         </main>
                     </>
@@ -750,6 +969,42 @@ const AppContent: React.FC = () => {
                     onCreateDonation={handleCreateDonationRequest}
                 />
             )}
+            
+            <NotificationsModal 
+                isOpen={isNotificationsModalOpen} 
+                onClose={() => setNotificationsModalOpen(false)} 
+                notifications={notifications}
+            />
+
+            <AnnounceCookedFoodModal
+                isOpen={isAnnounceFoodModalOpen}
+                onClose={() => setAnnounceFoodModalOpen(false)}
+                onAnnounce={handleAnnounceCookedFood}
+            />
+
+            <ClaimCookedFoodModal
+                isOpen={!!claimableFoodItem}
+                onClose={() => setClaimableFoodItem(null)}
+                foodItem={claimableFoodItem}
+                onClaim={handleClaimCookedFood}
+            />
+            
+            <TrackOrderModal
+                isOpen={!!trackableOrder}
+                onClose={() => setTrackableOrder(null)}
+                order={trackableOrder}
+            />
+
+            {assignableOrder && hotelProfile && (
+                <AssignDeliveryModal
+                    isOpen={!!assignableOrder}
+                    onClose={() => setAssignableOrder(null)}
+                    order={assignableOrder}
+                    onAssign={(deliveryPerson) => handleUpdateCookedFoodOrderStatus(assignableOrder.id, 'out_for_delivery', deliveryPerson)}
+                    hotelLocation={hotelProfile.location}
+                />
+            )}
+
 
         </div>
     );

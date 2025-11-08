@@ -1,5 +1,5 @@
 import React from 'react';
-import { PlusIcon, BuildingIcon, SettingsIcon, UserIcon, CameraIcon, HandHeartIcon } from './icons';
+import { PlusIcon, BuildingIcon, SettingsIcon, UserIcon, CameraIcon, HandHeartIcon, BellIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface HeaderProps {
@@ -9,9 +9,11 @@ interface HeaderProps {
     onOpenProfile: () => void;
     userType: 'public' | 'hotel' | 'food-bank' | null;
     userName?: string;
+    unreadNotificationCount: number;
+    onOpenNotifications: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onAddItem, onScanBill, onOpenSettings, onOpenProfile, userType, userName }) => {
+const Header: React.FC<HeaderProps> = ({ onAddItem, onScanBill, onOpenSettings, onOpenProfile, userType, userName, unreadNotificationCount, onOpenNotifications }) => {
     const { t } = useLanguage();
     
     return (
@@ -51,6 +53,21 @@ const Header: React.FC<HeaderProps> = ({ onAddItem, onScanBill, onOpenSettings, 
                                 <span className="hidden sm:inline">{t('header.add_item')}</span>
                             </button>
                         </>
+                    )}
+                     {userType === 'hotel' && (
+                        <button
+                            onClick={onOpenNotifications}
+                            className="relative flex items-center justify-center bg-light-bg text-text-light font-semibold p-2.5 rounded-full hover:bg-border-color transition-all duration-200"
+                            title="Notifications"
+                        >
+                            <BellIcon />
+                            {unreadNotificationCount > 0 && (
+                                <span className="absolute top-0 right-0 flex h-4 w-4">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-4 w-4 bg-danger text-white text-xs items-center justify-center">{unreadNotificationCount}</span>
+                                </span>
+                            )}
+                        </button>
                     )}
                      <button
                         onClick={onOpenSettings}

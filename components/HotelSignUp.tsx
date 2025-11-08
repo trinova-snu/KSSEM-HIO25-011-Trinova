@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ArrowLeftIcon, BuildingIcon, EyeIcon, EyeOffIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -26,7 +27,7 @@ const HotelSignUp: React.FC<HotelSignUpProps> = ({ onSignUp, onBack, onGoToLogin
             alert("Please fill in all required fields.");
             return;
         }
-        onSignUp({ name, location, email, cuisineType, contactNumber });
+        onSignUp({ id: `hotel-${new Date().getTime()}`, name, location, email, cuisineType, contactNumber });
     };
 
     return (

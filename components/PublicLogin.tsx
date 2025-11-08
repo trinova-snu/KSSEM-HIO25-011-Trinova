@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ArrowLeftIcon, UserIcon, GoogleIcon, EyeIcon, EyeOffIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -34,6 +35,7 @@ const PublicSignUp: React.FC<PublicSignUpProps> = ({ onSignUp, onBack, onGoToLog
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const profile: UserProfile = {
+            id: `user-${new Date().getTime()}`,
             name,
             email,
             country: location, // The location string from selector will be used as country for now.

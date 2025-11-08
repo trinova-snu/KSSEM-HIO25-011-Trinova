@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ArrowLeftIcon, HandHeartIcon, EyeIcon, EyeOffIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -27,7 +28,7 @@ const FoodBankSignUp: React.FC<FoodBankSignUpProps> = ({ onSignUp, onBack, onGoT
             alert("Please fill in all required fields.");
             return;
         }
-        onSignUp({ name, location, email, contactPerson, phoneNumber, website });
+        onSignUp({ id: `fb-${new Date().getTime()}`, name, location, email, contactPerson, phoneNumber, website });
     };
 
     return (

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { InventoryItem as InventoryItemType } from '../types';
-import { ChartBarIcon, CalendarIcon, InfoIcon, SparklesIcon, TrashIcon, TrophyIcon, CloseIcon, ChefHatIcon } from './icons';
+import { InventoryItem as InventoryItemType, CookedFoodItem } from '../types';
+import { ChartBarIcon, CalendarIcon, InfoIcon, SparklesIcon, TrashIcon, TrophyIcon, CloseIcon, ChefHatIcon, FireIcon } from './icons';
 import { useLanguage } from '../contexts/LanguageContext';
+import CookedFoodCard from './CookedFoodCard';
 
 interface DashboardProps {
     totalItems: number;
@@ -13,6 +14,8 @@ interface DashboardProps {
     expiringSoonItems: InventoryItemType[];
     isLoadingSmartPlate: boolean;
     onGenerateSmartPlate: (items: InventoryItemType[]) => void;
+    cookedFoodItems: CookedFoodItem[];
+    onClaimCookedFood: (item: CookedFoodItem) => void;
 }
 
 const StatCard: React.FC<{ title: string; value: number; icon: React.ReactNode; gradientClass: string }> = ({ title, value, icon, gradientClass }) => (
@@ -77,10 +80,12 @@ const PriorityItemCard: React.FC<{ item: InventoryItemType; onGetRecipes: () => 
     );
 };
 
-const Dashboard: React.FC<DashboardProps> = ({ totalItems, expiringSoonCount, expiredCount, priorityItems, onGetRecipes, onDeleteItem, expiringSoonItems, isLoadingSmartPlate, onGenerateSmartPlate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ totalItems, expiringSoonCount, expiredCount, priorityItems, onGetRecipes, onDeleteItem, expiringSoonItems, isLoadingSmartPlate, onGenerateSmartPlate, cookedFoodItems, onClaimCookedFood }) => {
     const { t } = useLanguage();
     const [showExpiryNotification, setShowExpiryNotification] = useState(true);
     
+    const availableCookedFood = cookedFoodItems.filter(item => item.status === 'available');
+
     return (
         <div className="space-y-8 animate-fade-in">
              <style>{`
@@ -102,6 +107,20 @@ const Dashboard: React.FC<DashboardProps> = ({ totalItems, expiringSoonCount, ex
                     <button onClick={() => setShowExpiryNotification(false)} className="text-warning/70 hover:text-warning">
                         <CloseIcon className="w-5 h-5"/>
                     </button>
+                </div>
+            )}
+
+             {availableCookedFood.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-2xl font-bold text-text-light border-b-2 border-secondary/50 pb-2 flex items-center gap-3">
+                        <FireIcon className="text-secondary" />
+                        {t('dashboard.available_today')}
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {availableCookedFood.map(item => (
+                            <CookedFoodCard key={item.id} item={item} onClaim={() => onClaimCookedFood(item)} />
+                        ))}
+                    </div>
                 </div>
             )}
 
